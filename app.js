@@ -12,6 +12,8 @@ import { firebaseConfig } from './firebase-config.js';
   ];
   const NEXT = { assigned: ['started', 'Start'], started: ['done', 'Complete'], part: ['done', 'Complete'] };
   const DEFAULT_PEOPLE = ['Steve', 'Harry', 'Em', 'Gail', 'Tradesperson'];
+  const DEFAULT_ROOMS = ['Kitchen', 'Lounge', 'Dining Room', 'Hall & Stairs', 'Bathroom', 'Bedroom 1', 'Bedroom 2', 'Bedroom 3', 'Garden', 'Garage'];
+  const NO_ROOM = '__none';
   const KEY = 'rosedene.v1';
   const ME_KEY = 'rosedene.me';
 
@@ -23,6 +25,7 @@ import { firebaseConfig } from './firebase-config.js';
   let state = load();
   let me = safeGet(ME_KEY) || '';
   let filter = 'All';
+  let roomFilter = 'All';
   let activeStage = 'todo';
   let draft = null;      // task being edited in the sheet
   let isNew = false;
@@ -33,9 +36,9 @@ import { firebaseConfig } from './firebase-config.js';
   function load() {
     try {
       const s = JSON.parse(safeGet(KEY));
-      if (s && Array.isArray(s.tasks) && Array.isArray(s.people)) return s;
+      if (s && Array.isArray(s.tasks) && Array.isArray(s.people)) return { rooms: [...DEFAULT_ROOMS], ...s };
     } catch {}
-    return { people: [...DEFAULT_PEOPLE], tasks: [] };
+    return { people: [...DEFAULT_PEOPLE], rooms: [...DEFAULT_ROOMS], tasks: [] };
   }
   // ---------- Persistence: Firestore (behind a passcode) when configured, otherwise this device only ----------
   // The 6-digit passcode is the name of the board in the database (houses/<passcode>/...). The Firestore rules
@@ -63,13 +66,13 @@ import { firebaseConfig } from './firebase-config.js';
   }
   function savePeople() {
     if (!cloud) return saveLocal();
-    cloud.fs.setDoc(dref('meta', 'people'), { list: state.people }).catch(cloudErr);
+    cloud.fs.setDoc(dref('meta', 'people'), { list: state.people, rooms: state.rooms }).catch(cloudErr);
   }
   function saveAll() {
     if (!cloud) return saveLocal();
     const batch = cloud.fs.writeBatch(cloud.db);
     state.tasks.forEach((t) => batch.set(dref('tasks', t.id), t));
-    batch.set(dref('meta', 'people'), { list: state.people });
+    batch.set(dref('meta', 'people'), { list: state.people, rooms: state.rooms });
     return batch.commit().catch(cloudErr);
   }
 
@@ -88,7 +91,7 @@ import { firebaseConfig } from './firebase-config.js';
     const { fs, db } = cloud;
     unsubs.push(
       fs.onSnapshot(fs.doc(db, 'houses', code, 'meta', 'people'), (snap) => {
-        if (snap.exists()) { state.people = snap.data().list; render(); if (!$('peopleOverlay').hidden) renderPeople(); }
+        if (snap.exists()) { state.people = snap.data().list; state.rooms = snap.data().rooms || [...DEFAULT_ROOMS]; render(); if (!$('peopleOverlay').hidden) renderPeople(); }
       }, cloudErr),
       fs.onSnapshot(fs.collection(db, 'houses', code, 'tasks'), (snap) => {
         state.tasks = snap.docs.map((d) => d.data());
@@ -103,7 +106,7 @@ import { firebaseConfig } from './firebase-config.js';
   }
   function stopBoard() {
     unsubs.forEach((u) => u()); unsubs = []; cloud = null;
-    state = { people: [...DEFAULT_PEOPLE], tasks: [] };
+    state = { people: [...DEFAULT_PEOPLE], rooms: [...DEFAULT_ROOMS], tasks: [] };
   }
   function lock() {
     stopBoard(); safeSet(CODE_KEY, '');
@@ -126,7 +129,7 @@ import { firebaseConfig } from './firebase-config.js';
       const r = fs.doc(db, 'houses', code, 'meta', 'people');
       const snap = await fs.getDoc(r);
       if (snap.exists()) return startBoard(code);
-      if (create) { await fs.setDoc(r, { list: [...DEFAULT_PEOPLE] }); return startBoard(code); }
+      if (create) { await fs.setDoc(r, { list: [...DEFAULT_PEOPLE], rooms: [...DEFAULT_ROOMS] }); return startBoard(code); }
       showGate('No board found for that passcode.', true);
       pendingCode = code;
     } catch (e) {
@@ -146,7 +149,7 @@ import { firebaseConfig } from './firebase-config.js';
 
   async function initCloud() {
     if (!USE_CLOUD) { document.body.classList.remove('locked'); $('gate').hidden = true; setSync('', 'Local only — not synced'); return; }
-    state = { people: [...DEFAULT_PEOPLE], tasks: [] };
+    state = { people: [...DEFAULT_PEOPLE], rooms: [...DEFAULT_ROOMS], tasks: [] };
     const saved = safeGet(CODE_KEY);
     if (/^\d{6}$/.test(saved || '')) { $('gateForm').hidden = true; $('gateMsg').textContent = 'Opening…'; tryCode(saved, { silent: true }); }
     else showGate();
@@ -188,7 +191,13 @@ import { firebaseConfig } from './firebase-config.js';
     $('filters').innerHTML = ['All', ...state.people]
       .map((p) => `<button type="button" class="filter ${p === filter ? 'on' : ''}" data-f="${esc(p)}">${esc(p)}</button>`).join('');
 
-    const visible = state.tasks.filter((t) => filter === 'All' || t.assignees.includes(filter));
+    if (roomFilter !== 'All' && roomFilter !== NO_ROOM && !state.rooms.includes(roomFilter)) roomFilter = 'All';
+    $('roomFilter').innerHTML = `<option value="All">All rooms</option>` +
+      state.rooms.map((r) => `<option value="${esc(r)}" ${r === roomFilter ? 'selected' : ''}>${esc(r)}</option>`).join('') +
+      `<option value="${NO_ROOM}" ${roomFilter === NO_ROOM ? 'selected' : ''}>No room</option>`;
+
+    const inRoom = (t) => roomFilter === 'All' || (roomFilter === NO_ROOM ? !roomsOf(t).length : roomsOf(t).includes(roomFilter));
+    const visible = state.tasks.filter((t) => (filter === 'All' || t.assignees.includes(filter)) && inRoom(t));
     const byStage = (id) => visible.filter((t) => t.status === id)
       .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.created - b.created);
 
@@ -204,7 +213,10 @@ import { firebaseConfig } from './firebase-config.js';
     }).join('');
   }
 
+  const roomsOf = (t) => t.rooms || [];
+
   function card(t) {
+    const rooms = roomsOf(t).map((r) => `<span class="tag room">${esc(r)}</span>`).join('');
     const assigned = t.assignees.map((a) => `<span class="tag">${esc(a)}</span>`).join('');
     const due = t.due ? `<span class="tag ${isLate(t) ? 'late' : 'due'}">${isLate(t) ? 'Overdue · ' : 'Due '}${fmtDate(t.due)}</span>` : '';
     const meta = [t.photos.length ? `${t.photos.length} photo${t.photos.length > 1 ? 's' : ''}` : '', t.links.length ? `${t.links.length} link${t.links.length > 1 ? 's' : ''}` : '']
@@ -219,7 +231,7 @@ import { firebaseConfig } from './firebase-config.js';
     return `<article class="card" draggable="true" data-id="${t.id}">
       <h3>${esc(t.title)}</h3>
       ${t.details ? `<p>${esc(t.details)}</p>` : ''}
-      <div class="tags">${assigned}${due}${meta}</div>
+      <div class="tags">${rooms}${assigned}${due}${meta}</div>
       ${actions.length ? `<div class="card-actions">${actions.join('')}</div>` : ''}
     </article>`;
   }
@@ -233,6 +245,7 @@ import { firebaseConfig } from './firebase-config.js';
     const b = e.target.closest('[data-f]'); if (!b) return;
     filter = b.dataset.f; render();
   });
+  $('roomFilter').addEventListener('change', (e) => { roomFilter = e.target.value; render(); });
   $('meSelect').addEventListener('change', (e) => { me = e.target.value; safeSet(ME_KEY, me); render(); });
 
   $('board').addEventListener('click', (e) => {
@@ -277,8 +290,8 @@ import { firebaseConfig } from './firebase-config.js';
   function openSheet(task) {
     isNew = !task;
     draft = task
-      ? JSON.parse(JSON.stringify(task))
-      : { id: uid(), title: '', details: '', due: '', assignees: [], status: 'todo', photos: [], links: [], created: Date.now(), updated: Date.now() };
+      ? { rooms: [], ...JSON.parse(JSON.stringify(task)) }
+      : { id: uid(), title: '', details: '', due: '', assignees: [], rooms: [], status: 'todo', photos: [], links: [], created: Date.now(), updated: Date.now() };
     $('sheetTitle').textContent = isNew ? 'New task' : 'Edit task';
     $('fTitle').value = draft.title;
     $('fDetails').value = draft.details;
@@ -295,6 +308,8 @@ import { firebaseConfig } from './firebase-config.js';
   function renderSheet() {
     $('fPeople').innerHTML = state.people.map((p) =>
       `<button type="button" class="chip ${draft.assignees.includes(p) ? 'on' : ''}" data-p="${esc(p)}">${esc(p)}</button>`).join('');
+    $('fRooms').innerHTML = state.rooms.map((r) =>
+      `<button type="button" class="chip room ${draft.rooms.includes(r) ? 'on' : ''}" data-r="${esc(r)}">${esc(r)}</button>`).join('');
     $('fStage').innerHTML = STAGES.map((s) =>
       `<button type="button" class="chip ${draft.status === s.id ? 'on' : ''}" data-s="${s.id}">${s.label}</button>`).join('');
     $('fPhotos').innerHTML = draft.photos.map((src, i) =>
@@ -308,6 +323,12 @@ import { firebaseConfig } from './firebase-config.js';
     const p = b.dataset.p, a = draft.assignees;
     a.includes(p) ? a.splice(a.indexOf(p), 1) : a.push(p);
     normalise(draft); renderSheet();
+  });
+  $('fRooms').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-r]'); if (!b) return;
+    const r = b.dataset.r, a = draft.rooms;
+    a.includes(r) ? a.splice(a.indexOf(r), 1) : a.push(r);
+    renderSheet();
   });
   $('fStage').addEventListener('click', (e) => {
     const b = e.target.closest('[data-s]'); if (!b) return;
@@ -385,6 +406,8 @@ import { firebaseConfig } from './firebase-config.js';
   function renderPeople() {
     $('peopleList').innerHTML = state.people.map((p) =>
       `<li><span>${esc(p)}</span><button type="button" data-del="${esc(p)}">Remove</button></li>`).join('');
+    $('roomList').innerHTML = state.rooms.map((r) =>
+      `<li><span>${esc(r)}</span><button type="button" data-delroom="${esc(r)}">Remove</button></li>`).join('');
   }
   $('peopleBtn').addEventListener('click', () => { renderPeople(); $('peopleOverlay').hidden = false; });
   $('closePeople').addEventListener('click', () => { $('peopleOverlay').hidden = true; });
@@ -395,6 +418,24 @@ import { firebaseConfig } from './firebase-config.js';
     if (!n) return;
     if (state.people.some((p) => p.toLowerCase() === n.toLowerCase())) return toast('Already on the list');
     state.people.push(n); $('personName').value = ''; savePeople(); renderPeople(); render();
+  });
+  $('roomForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const n = $('roomName').value.trim();
+    if (!n) return;
+    if (state.rooms.some((r) => r.toLowerCase() === n.toLowerCase())) return toast('Already on the list');
+    state.rooms.push(n); $('roomName').value = ''; savePeople(); renderPeople(); render();
+  });
+  $('roomList').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-delroom]'); if (!b) return;
+    const r = b.dataset.delroom;
+    if (!confirm(`Remove the room "${r}"? It will be taken off any tasks.`)) return;
+    state.rooms = state.rooms.filter((x) => x !== r);
+    state.tasks.forEach((t) => {
+      if (!roomsOf(t).includes(r)) return;
+      t.rooms = t.rooms.filter((x) => x !== r); touch(t); saveTask(t);
+    });
+    savePeople(); renderPeople(); render();
   });
   $('peopleList').addEventListener('click', (e) => {
     const b = e.target.closest('[data-del]'); if (!b) return;
@@ -422,7 +463,7 @@ import { firebaseConfig } from './firebase-config.js';
       const s = JSON.parse(await f.text());
       if (!Array.isArray(s.tasks) || !Array.isArray(s.people)) throw 0;
       if (!confirm('Replace everything on this device with this backup?')) return;
-      state = s; saveAll(); $('peopleOverlay').hidden = true; render(); toast('Backup restored');
+      state = { rooms: [...DEFAULT_ROOMS], ...s }; saveAll(); $('peopleOverlay').hidden = true; render(); toast('Backup restored');
     } catch { toast('That file isn\'t a valid backup'); }
   });
 

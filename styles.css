@@ -290,3 +290,12 @@ body.locked > header, body.locked > nav, body.locked > main { display: none; }
 .gate-card input:focus { outline: 2px solid var(--peach); border-color: var(--peach); }
 .gate-msg { min-height: 1.4em; margin: 12px 0 0; font-size: 14px; color: var(--danger); }
 .gate-card .btn { width: 100%; margin-top: 4px; }
+
+/* ---------- Rooms ---------- */
+.room-filter { margin-left: 0; }
+.room-filter select { max-width: 150px; font-family: var(--font-ui); font-size: 13px; }
+.tag.room { background: transparent; color: var(--ink); border: 1px solid var(--ink-soft); }
+.chip.room { border-color: var(--peach-deep); color: #8A5744; }
+.chip.room.on { background: var(--peach); border-color: var(--peach); color: var(--ink); }
+.list-title { font-family: var(--font-ui); font-weight: 400; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin: 4px 0 8px; }
+.people-list + .link-add { margin-bottom: 18px; }

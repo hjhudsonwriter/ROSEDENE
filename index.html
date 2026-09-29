@@ -47,8 +47,11 @@
       <select id="meSelect" aria-label="Who are you?"></select>
     </label>
     <span class="sync" id="sync" title="Sync status"></span>
+    <label class="me room-filter">
+      <select id="roomFilter" aria-label="Filter by room"></select>
+    </label>
     <div class="filters" id="filters" role="group" aria-label="Filter by person"></div>
-    <button class="btn btn-ghost" id="peopleBtn" type="button">People</button>
+    <button class="btn btn-ghost" id="peopleBtn" type="button">Manage</button>
   </div>
 </header>
 
@@ -83,6 +86,11 @@
       <div class="field">
         <span>Assigned to</span>
         <div class="chips" id="fPeople"></div>
+      </div>
+
+      <div class="field">
+        <span>Room</span>
+        <div class="chips" id="fRooms"></div>
       </div>
 
       <div class="field" id="stageField">
@@ -123,13 +131,21 @@
 <div class="overlay" id="peopleOverlay" hidden>
   <div class="sheet small">
     <div class="sheet-head">
-      <h2>People</h2>
+      <h2>People &amp; Rooms</h2>
       <button type="button" class="icon-btn" id="closePeople" aria-label="Close">×</button>
     </div>
     <div class="sheet-body">
+      <h3 class="list-title">People</h3>
       <ul class="people-list" id="peopleList"></ul>
       <form class="link-add" id="personForm">
         <input type="text" id="personName" placeholder="Add a person" maxlength="24" required>
+        <button class="btn btn-primary" type="submit">Add</button>
+      </form>
+
+      <h3 class="list-title">Rooms</h3>
+      <ul class="people-list" id="roomList"></ul>
+      <form class="link-add" id="roomForm">
+        <input type="text" id="roomName" placeholder="Add a room or area" maxlength="24" required>
         <button class="btn btn-primary" type="submit">Add</button>
       </form>
       <div class="backup">
