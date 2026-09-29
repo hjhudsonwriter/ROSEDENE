@@ -55,9 +55,25 @@
   </div>
 </header>
 
+<div class="viewbar" role="group" aria-label="View">
+  <button type="button" class="view-btn on" id="viewBoard" data-view="board">Board</button>
+  <button type="button" class="view-btn" id="viewCal" data-view="cal">Calendar</button>
+</div>
+
 <nav class="tabs" id="tabs" role="tablist" aria-label="Stages"></nav>
 
 <main class="board" id="board"></main>
+
+<section class="cal" id="cal">
+  <div class="cal-nav">
+    <button type="button" class="btn btn-ghost" id="calPrev" aria-label="Previous month">‹</button>
+    <h2 id="calTitle"></h2>
+    <button type="button" class="btn btn-ghost" id="calNext" aria-label="Next month">›</button>
+    <button type="button" class="btn btn-ghost" id="calToday">Today</button>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+  <div class="cal-day" id="calDay"></div>
+</section>
 
 <!-- Task sheet -->
 <div class="overlay" id="overlay" hidden>

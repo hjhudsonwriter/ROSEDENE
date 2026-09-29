@@ -26,6 +26,11 @@ import { firebaseConfig } from './firebase-config.js';
   let me = safeGet(ME_KEY) || '';
   let filter = 'All';
   let roomFilter = 'All';
+  let view = safeGet('rosedene.view') === 'cal' ? 'cal' : 'board';
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  let calMonth = new Date(); calMonth.setDate(1);
+  let calDay = null;      // selected day (yyyy-mm-dd) or null for "whole month"
+  let visibleTasks = [];
   let activeStage = 'todo';
   let draft = null;      // task being edited in the sheet
   let isNew = false;
@@ -198,6 +203,7 @@ import { firebaseConfig } from './firebase-config.js';
 
     const inRoom = (t) => roomFilter === 'All' || (roomFilter === NO_ROOM ? !roomsOf(t).length : roomsOf(t).includes(roomFilter));
     const visible = state.tasks.filter((t) => (filter === 'All' || t.assignees.includes(filter)) && inRoom(t));
+    visibleTasks = visible;
     const byStage = (id) => visible.filter((t) => t.status === id)
       .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.created - b.created);
 
@@ -211,6 +217,42 @@ import { firebaseConfig } from './firebase-config.js';
         ${list.length ? list.map(card).join('') : '<div class="empty">Nothing here yet</div>'}
       </section>`;
     }).join('');
+    renderCal();
+  }
+
+  // ---------- Calendar ----------
+  function renderCal() {
+    document.body.classList.toggle('view-cal', view === 'cal');
+    document.querySelectorAll('.view-btn').forEach((b) => b.classList.toggle('on', b.dataset.view === view));
+    if (view !== 'cal') return;
+
+    const y = calMonth.getFullYear(), m = calMonth.getMonth();
+    $('calTitle').textContent = calMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const byDay = {};
+    visibleTasks.forEach((t) => { if (t.due) (byDay[t.due] = byDay[t.due] || []).push(t); });
+    const today = iso(new Date());
+    const lead = (new Date(y, m, 1).getDay() + 6) % 7;      // Monday first
+    const days = new Date(y, m + 1, 0).getDate();
+    let html = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => `<div class="dow">${d}</div>`).join('');
+    html += '<div class="blank"></div>'.repeat(lead);
+    for (let d = 1; d <= days; d++) {
+      const key = iso(new Date(y, m, d));
+      const list = byDay[key] || [];
+      const dots = list.slice(0, 4).map((t) => `<i data-stage="${t.status}" class="${t.status === 'done' ? 'fin' : ''}"></i>`).join('') + (list.length > 4 ? `<em>+${list.length - 4}</em>` : '');
+      const names = list.slice(0, 2).map((t) => `<span data-stage="${t.status}" class="${t.status === 'done' ? 'fin' : ''}">${esc(t.title)}</span>`).join('') + (list.length > 2 ? `<em>+${list.length - 2} more</em>` : '');
+      html += `<button type="button" class="day ${key === today ? 'today' : ''} ${key === calDay ? 'sel' : ''} ${list.length ? 'has' : ''}" data-d="${key}">
+        <b>${d}</b><div class="dots">${dots}</div><div class="names">${names}</div></button>`;
+    }
+    $('calGrid').innerHTML = html;
+
+    const prefix = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const list = (calDay ? visibleTasks.filter((t) => t.due === calDay) : visibleTasks.filter((t) => (t.due || '').startsWith(prefix)))
+      .sort((a, b) => (a.due || '').localeCompare(b.due || '') || a.created - b.created);
+    const heading = calDay ? fmtDate(calDay) : `Due in ${calMonth.toLocaleDateString('en-GB', { month: 'long' })}`;
+    $('calDay').innerHTML = `<div class="cal-day-head"><h3>${heading}</h3>
+      ${calDay ? `<button type="button" class="mini solid" data-addday="${calDay}">+ Task on this day</button><button type="button" class="mini" data-clearday>Show whole month</button>` : ''}</div>
+      ${list.length ? list.map((t) => `<div data-stage="${t.status}">${card(t)}</div>`).join('') : '<div class="empty">No tasks due</div>'}
+      ${calDay ? '' : `<p class="cal-note">${visibleTasks.filter((t) => !t.due).length} task(s) have no due date and don't appear here.</p>`}`;
   }
 
   const roomsOf = (t) => t.rooms || [];
@@ -248,7 +290,7 @@ import { firebaseConfig } from './firebase-config.js';
   $('roomFilter').addEventListener('change', (e) => { roomFilter = e.target.value; render(); });
   $('meSelect').addEventListener('change', (e) => { me = e.target.value; safeSet(ME_KEY, me); render(); });
 
-  $('board').addEventListener('click', (e) => {
+  const onCardClick = (e) => {
     const cardEl = e.target.closest('.card'); if (!cardEl) return;
     const t = state.tasks.find((x) => x.id === cardEl.dataset.id); if (!t) return;
     const act = e.target.closest('[data-act]')?.dataset.act;
@@ -258,6 +300,26 @@ import { firebaseConfig } from './firebase-config.js';
     if (act === 'part') { t.status = 'part'; }
     if (act === 'reopen') { t.status = t.assignees.length ? 'started' : 'todo'; }
     touch(t); saveTask(t); render();
+  };
+  $('board').addEventListener('click', onCardClick);
+  $('calDay').addEventListener('click', (e) => {
+    const add = e.target.closest('[data-addday]');
+    if (add) return openSheet(null, add.dataset.addday);
+    if (e.target.closest('[data-clearday]')) { calDay = null; return render(); }
+    onCardClick(e);
+  });
+
+  // Calendar navigation
+  document.querySelector('.viewbar').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-view]'); if (!b) return;
+    view = b.dataset.view; safeSet('rosedene.view', view); render();
+  });
+  $('calPrev').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() - 1); calDay = null; render(); });
+  $('calNext').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() + 1); calDay = null; render(); });
+  $('calToday').addEventListener('click', () => { calMonth = new Date(); calMonth.setDate(1); calDay = iso(new Date()); render(); });
+  $('calGrid').addEventListener('click', (e) => {
+    const d = e.target.closest('[data-d]'); if (!d) return;
+    calDay = calDay === d.dataset.d ? null : d.dataset.d; render();
   });
 
   // Drag & drop between columns (desktop)
@@ -287,11 +349,12 @@ import { firebaseConfig } from './firebase-config.js';
   // ---------- Task sheet ----------
   $('addBtn').addEventListener('click', () => openSheet(null));
 
-  function openSheet(task) {
+  function openSheet(task, dueDate = '') {
     isNew = !task;
     draft = task
       ? { rooms: [], ...JSON.parse(JSON.stringify(task)) }
       : { id: uid(), title: '', details: '', due: '', assignees: [], rooms: [], status: 'todo', photos: [], links: [], created: Date.now(), updated: Date.now() };
+    if (!task) draft.due = dueDate;
     $('sheetTitle').textContent = isNew ? 'New task' : 'Edit task';
     $('fTitle').value = draft.title;
     $('fDetails').value = draft.details;
