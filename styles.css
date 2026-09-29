@@ -202,3 +202,11 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--peach); out
   .top-row.sub { justify-content: space-between; }
   .btn-ghost#peopleBtn { padding: 7px 14px; }
 }
+
+/* ---------- Logo & sync ---------- */
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { height: 64px; width: auto; flex: none; mix-blend-mode: multiply; /* white background melts into the header */ }
+.sync { width: 9px; height: 9px; border-radius: 50%; background: var(--main-deep); flex: none; }
+.sync.live { background: var(--green); }
+.sync.err { background: var(--danger); }
+@media (max-width: 520px) { .logo { height: 52px; } }

@@ -1,4 +1,6 @@
-(() => {
+import { firebaseConfig } from './firebase-config.js';
+
+(async () => {
   'use strict';
 
   const STAGES = [
@@ -35,8 +37,53 @@
     } catch {}
     return { people: [...DEFAULT_PEOPLE], tasks: [] };
   }
-  function save() {
+  // ---------- Persistence: Firestore when configured, otherwise this device only ----------
+  const FB = 'https://www.gstatic.com/firebasejs/10.12.2/';
+  let cloud = null;
+  const setSync = (cls, title) => { const el = $('sync'); if (el) { el.className = 'sync ' + cls; el.title = title; } };
+
+  function saveLocal() {
     if (!safeSet(KEY, JSON.stringify(state))) toast('Storage is full — remove some photos or export a backup.');
+  }
+  const cloudErr = (e) => { console.error(e); setSync('err', 'Sync problem'); toast('Couldn\'t sync — check your connection'); };
+  function saveTask(t) {
+    if (!cloud) return saveLocal();
+    cloud.fs.setDoc(cloud.fs.doc(cloud.db, 'tasks', t.id), t).catch(cloudErr);
+  }
+  function removeTask(id) {
+    if (!cloud) return saveLocal();
+    cloud.fs.deleteDoc(cloud.fs.doc(cloud.db, 'tasks', id)).catch(cloudErr);
+  }
+  function savePeople() {
+    if (!cloud) return saveLocal();
+    cloud.fs.setDoc(cloud.fs.doc(cloud.db, 'meta', 'people'), { list: state.people }).catch(cloudErr);
+  }
+  function saveAll() {
+    if (!cloud) return saveLocal();
+    const batch = cloud.fs.writeBatch(cloud.db);
+    state.tasks.forEach((t) => batch.set(cloud.fs.doc(cloud.db, 'tasks', t.id), t));
+    batch.set(cloud.fs.doc(cloud.db, 'meta', 'people'), { list: state.people });
+    return batch.commit().catch(cloudErr);
+  }
+
+  async function initCloud() {
+    if (!firebaseConfig.apiKey) { setSync('', 'Local only — not synced'); return; }
+    try {
+      const [{ initializeApp }, fs] = await Promise.all([import(FB + 'firebase-app.js'), import(FB + 'firebase-firestore.js')]);
+      const app = initializeApp(firebaseConfig);
+      const db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
+      cloud = { db, fs };
+      let seeded = false;
+      fs.onSnapshot(fs.doc(db, 'meta', 'people'), (snap) => {
+        if (snap.exists()) { state.people = snap.data().list; render(); if (!$('peopleOverlay').hidden) renderPeople(); }
+        else if (!seeded) { seeded = true; savePeople(); }
+      }, cloudErr);
+      fs.onSnapshot(fs.collection(db, 'tasks'), (snap) => {
+        state.tasks = snap.docs.map((d) => d.data());
+        setSync('live', snap.metadata.fromCache ? 'Offline — will sync when back online' : 'Synced');
+        render();
+      }, cloudErr);
+    } catch (e) { cloud = null; cloudErr(e); }
   }
 
   // ---------- Helpers ----------
@@ -131,7 +178,7 @@
     if (act === 'next') { setStatus(t, NEXT[t.status][0]); }
     if (act === 'part') { t.status = 'part'; }
     if (act === 'reopen') { t.status = t.assignees.length ? 'started' : 'todo'; }
-    touch(t); save(); render();
+    touch(t); saveTask(t); render();
   });
 
   // Drag & drop between columns (desktop)
@@ -151,7 +198,7 @@
     const t = state.tasks.find((x) => x.id === dragId);
     if (t && t.status !== col.dataset.stage && setStatus(t, col.dataset.stage)) {
       if (col.dataset.stage === 'todo') t.assignees = [];
-      touch(t); save();
+      touch(t); saveTask(t);
     }
     dragId = null; render();
   });
@@ -229,7 +276,7 @@
   });
 
   // Resize photos so they fit comfortably in browser storage
-  function shrink(file, max = 1000, quality = 0.72) {
+  function shrink(file, max = 800, quality = 0.65) {
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
@@ -253,15 +300,16 @@
     draft.details = $('fDetails').value.trim();
     draft.due = $('fDue').value;
     normalise(draft); touch(draft);
+    if (cloud && JSON.stringify(draft).length > 950000) return toast('Too many photos for one task — remove a few');
+    activeStage = draft.status;
     if (isNew) state.tasks.push(draft);
     else state.tasks[state.tasks.findIndex((t) => t.id === draft.id)] = draft;
-    activeStage = draft.status;
-    save(); closeSheet(); render();
+    saveTask(draft); closeSheet(); render();
   });
   $('deleteBtn').addEventListener('click', () => {
     if (!confirm('Delete this task?')) return;
     state.tasks = state.tasks.filter((t) => t.id !== draft.id);
-    save(); closeSheet(); render();
+    removeTask(draft.id); closeSheet(); render();
   });
   $('closeSheet').addEventListener('click', closeSheet);
   $('cancelBtn').addEventListener('click', closeSheet);
@@ -280,16 +328,19 @@
     const n = $('personName').value.trim();
     if (!n) return;
     if (state.people.some((p) => p.toLowerCase() === n.toLowerCase())) return toast('Already on the list');
-    state.people.push(n); $('personName').value = ''; save(); renderPeople(); render();
+    state.people.push(n); $('personName').value = ''; savePeople(); renderPeople(); render();
   });
   $('peopleList').addEventListener('click', (e) => {
     const b = e.target.closest('[data-del]'); if (!b) return;
     const p = b.dataset.del;
     if (!confirm(`Remove ${p}? They'll be unassigned from any tasks.`)) return;
     state.people = state.people.filter((x) => x !== p);
-    state.tasks.forEach((t) => { t.assignees = t.assignees.filter((a) => a !== p); normalise(t); });
+    state.tasks.forEach((t) => {
+      if (!t.assignees.includes(p)) return;
+      t.assignees = t.assignees.filter((a) => a !== p); normalise(t); touch(t); saveTask(t);
+    });
     if (me === p) { me = ''; safeSet(ME_KEY, ''); }
-    save(); renderPeople(); render();
+    savePeople(); renderPeople(); render();
   });
 
   // Backup
@@ -305,7 +356,7 @@
       const s = JSON.parse(await f.text());
       if (!Array.isArray(s.tasks) || !Array.isArray(s.people)) throw 0;
       if (!confirm('Replace everything on this device with this backup?')) return;
-      state = s; save(); $('peopleOverlay').hidden = true; render(); toast('Backup restored');
+      state = s; saveAll(); $('peopleOverlay').hidden = true; render(); toast('Backup restored');
     } catch { toast('That file isn\'t a valid backup'); }
   });
 
@@ -317,4 +368,6 @@
   });
 
   render();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  await initCloud();
 })();
