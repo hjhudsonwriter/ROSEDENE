@@ -18,14 +18,15 @@ Until you complete this, the app still works but only saves on the device you're
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+    // The board's name IS the 6-digit passcode. Boards can't be listed, so you must know the code.
+    match /houses/{code}/{document=**} {
+      allow read, write: if code.matches('[0-9]{6}');
     }
   }
 }
 ```
 
-**Privacy note:** these rules let anyone who has your app's URL and config read and write the board. That's fine for a household list you don't share publicly, but don't post the link around. Ask if you'd like a shared passcode added.
+**Passcode:** when the app opens it asks for a 6-digit passcode. The passcode is the name of the board in the database and the rules above don't allow boards to be listed, so nobody can read or edit tasks without knowing it. The first time you enter a new passcode the app offers to create a new board for it; after that everyone uses the same code. Choose one that isn't obvious (a stranger could in theory guess codes one by one). Use **People → Lock this device** to forget the code on a shared phone.
 
 Free-tier limits (Spark): 1 GiB storage, 50k reads and 20k writes per day — far more than a house project needs. Photos are compressed and stored inside each task (about 8–10 per task max), which avoids Firebase Storage, which is no longer free.
 

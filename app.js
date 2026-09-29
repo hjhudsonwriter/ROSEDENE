@@ -37,53 +37,119 @@ import { firebaseConfig } from './firebase-config.js';
     } catch {}
     return { people: [...DEFAULT_PEOPLE], tasks: [] };
   }
-  // ---------- Persistence: Firestore when configured, otherwise this device only ----------
+  // ---------- Persistence: Firestore (behind a passcode) when configured, otherwise this device only ----------
+  // The 6-digit passcode is the name of the board in the database (houses/<passcode>/...). The Firestore rules
+  // don't allow listing boards, so you can only reach data if you already know the passcode.
   const FB = 'https://www.gstatic.com/firebasejs/10.12.2/';
-  let cloud = null;
+  const CODE_KEY = 'rosedene.code';
+  const USE_CLOUD = !!firebaseConfig.apiKey;
+  let fbLib = null;     // { db, fs } once Firebase is loaded
+  let cloud = null;     // { db, fs, code } while a board is open
+  let unsubs = [];
   const setSync = (cls, title) => { const el = $('sync'); if (el) { el.className = 'sync ' + cls; el.title = title; } };
 
   function saveLocal() {
     if (!safeSet(KEY, JSON.stringify(state))) toast('Storage is full — remove some photos or export a backup.');
   }
   const cloudErr = (e) => { console.error(e); setSync('err', 'Sync problem'); toast('Couldn\'t sync — check your connection'); };
+  const dref = (...path) => cloud.fs.doc(cloud.db, 'houses', cloud.code, ...path);
   function saveTask(t) {
     if (!cloud) return saveLocal();
-    cloud.fs.setDoc(cloud.fs.doc(cloud.db, 'tasks', t.id), t).catch(cloudErr);
+    cloud.fs.setDoc(dref('tasks', t.id), t).catch(cloudErr);
   }
   function removeTask(id) {
     if (!cloud) return saveLocal();
-    cloud.fs.deleteDoc(cloud.fs.doc(cloud.db, 'tasks', id)).catch(cloudErr);
+    cloud.fs.deleteDoc(dref('tasks', id)).catch(cloudErr);
   }
   function savePeople() {
     if (!cloud) return saveLocal();
-    cloud.fs.setDoc(cloud.fs.doc(cloud.db, 'meta', 'people'), { list: state.people }).catch(cloudErr);
+    cloud.fs.setDoc(dref('meta', 'people'), { list: state.people }).catch(cloudErr);
   }
   function saveAll() {
     if (!cloud) return saveLocal();
     const batch = cloud.fs.writeBatch(cloud.db);
-    state.tasks.forEach((t) => batch.set(cloud.fs.doc(cloud.db, 'tasks', t.id), t));
-    batch.set(cloud.fs.doc(cloud.db, 'meta', 'people'), { list: state.people });
+    state.tasks.forEach((t) => batch.set(dref('tasks', t.id), t));
+    batch.set(dref('meta', 'people'), { list: state.people });
     return batch.commit().catch(cloudErr);
   }
 
-  async function initCloud() {
-    if (!firebaseConfig.apiKey) { setSync('', 'Local only — not synced'); return; }
-    try {
-      const [{ initializeApp }, fs] = await Promise.all([import(FB + 'firebase-app.js'), import(FB + 'firebase-firestore.js')]);
-      const app = initializeApp(firebaseConfig);
-      const db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
-      cloud = { db, fs };
-      let seeded = false;
-      fs.onSnapshot(fs.doc(db, 'meta', 'people'), (snap) => {
+  async function loadFirebase() {
+    if (fbLib) return fbLib;
+    const [{ initializeApp }, fs] = await Promise.all([import(FB + 'firebase-app.js'), import(FB + 'firebase-firestore.js')]);
+    const app = initializeApp(firebaseConfig);
+    const db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
+    return (fbLib = { db, fs });
+  }
+
+  function startBoard(code) {
+    stopBoard();
+    cloud = { ...fbLib, code };
+    safeSet(CODE_KEY, code);
+    const { fs, db } = cloud;
+    unsubs.push(
+      fs.onSnapshot(fs.doc(db, 'houses', code, 'meta', 'people'), (snap) => {
         if (snap.exists()) { state.people = snap.data().list; render(); if (!$('peopleOverlay').hidden) renderPeople(); }
-        else if (!seeded) { seeded = true; savePeople(); }
-      }, cloudErr);
-      fs.onSnapshot(fs.collection(db, 'tasks'), (snap) => {
+      }, cloudErr),
+      fs.onSnapshot(fs.collection(db, 'houses', code, 'tasks'), (snap) => {
         state.tasks = snap.docs.map((d) => d.data());
         setSync('live', snap.metadata.fromCache ? 'Offline — will sync when back online' : 'Synced');
         render();
-      }, cloudErr);
-    } catch (e) { cloud = null; cloudErr(e); }
+      }, cloudErr),
+    );
+    $('lockBtn').hidden = false;
+    $('gate').hidden = true;
+    document.body.classList.remove('locked');
+    render();
+  }
+  function stopBoard() {
+    unsubs.forEach((u) => u()); unsubs = []; cloud = null;
+    state = { people: [...DEFAULT_PEOPLE], tasks: [] };
+  }
+  function lock() {
+    stopBoard(); safeSet(CODE_KEY, '');
+    $('peopleOverlay').hidden = true; if (draft) closeSheet();
+    document.body.classList.add('locked'); $('lockBtn').hidden = true;
+    showGate();
+  }
+
+  // ---------- Passcode gate ----------
+  function showGate(msg = '', offerCreate = false) {
+    $('gate').hidden = false;
+    $('gateForm').hidden = false;
+    $('gateMsg').textContent = msg;
+    $('gateCreate').hidden = !offerCreate;
+    $('gateCode').value = ''; $('gateCode').focus();
+  }
+  async function tryCode(code, { create = false, silent = false } = {}) {
+    try {
+      const { db, fs } = await loadFirebase();
+      const r = fs.doc(db, 'houses', code, 'meta', 'people');
+      const snap = await fs.getDoc(r);
+      if (snap.exists()) return startBoard(code);
+      if (create) { await fs.setDoc(r, { list: [...DEFAULT_PEOPLE] }); return startBoard(code); }
+      showGate('No board found for that passcode.', true);
+      pendingCode = code;
+    } catch (e) {
+      console.error(e);
+      if (silent && e.code === 'unavailable') return startBoard(code);   // offline: use the cached board
+      const msg = e.code === 'permission-denied'
+        ? 'The database rules need updating — see the README.'
+        : 'Couldn\'t reach the database. Check your connection.';
+      showGate(msg);
+    }
+  }
+  let pendingCode = '';
+  $('gateForm').addEventListener('submit', (e) => { e.preventDefault(); const c = $('gateCode').value.trim(); if (/^\d{6}$/.test(c)) tryCode(c); });
+  $('gateCode').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); $('gateMsg').textContent = ''; $('gateCreate').hidden = true; if (e.target.value.length === 6) $('gateForm').requestSubmit(); });
+  $('gateCreate').addEventListener('click', () => { if (pendingCode) tryCode(pendingCode, { create: true }); });
+  $('lockBtn').addEventListener('click', lock);
+
+  async function initCloud() {
+    if (!USE_CLOUD) { document.body.classList.remove('locked'); $('gate').hidden = true; setSync('', 'Local only — not synced'); return; }
+    state = { people: [...DEFAULT_PEOPLE], tasks: [] };
+    const saved = safeGet(CODE_KEY);
+    if (/^\d{6}$/.test(saved || '')) { $('gateForm').hidden = true; $('gateMsg').textContent = 'Opening…'; tryCode(saved, { silent: true }); }
+    else showGate();
   }
 
   // ---------- Helpers ----------

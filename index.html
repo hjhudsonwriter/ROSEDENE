@@ -13,10 +13,25 @@
 <title>Rosedene Task Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Alata&family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="locked">
+
+<!-- Passcode gate (only used once the shared database is configured) -->
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <img class="gate-logo" src="icons/logo.jpg" alt="Rosedene house" width="480" height="440">
+    <h2>Rosedene <span>Task Tracker</span></h2>
+    <form id="gateForm" autocomplete="off">
+      <label for="gateCode">Enter passcode</label>
+      <input id="gateCode" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="••••••" autocomplete="off" required>
+      <button class="btn btn-primary" type="submit">Enter</button>
+    </form>
+    <p class="gate-msg" id="gateMsg" role="status"></p>
+    <button class="btn btn-ghost" id="gateCreate" type="button" hidden>Create a new board with this passcode</button>
+  </div>
+</div>
 
 <header class="top">
   <div class="top-row">
@@ -118,6 +133,7 @@
         <button class="btn btn-primary" type="submit">Add</button>
       </form>
       <div class="backup">
+        <button type="button" class="btn btn-ghost" id="lockBtn" hidden>Lock this device</button>
         <button type="button" class="btn btn-ghost" id="exportBtn">Export backup</button>
         <label class="btn btn-ghost file-btn">Import backup
           <input type="file" id="importInput" accept="application/json" hidden>

@@ -210,3 +210,83 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--peach); out
 .sync.live { background: var(--green); }
 .sync.err { background: var(--danger); }
 @media (max-width: 520px) { .logo { height: 52px; } }
+
+/* =====================================================================
+   Theme: more colour + type
+   Headings: Cormorant Garamond (closest free match to "The Seasons")
+   Labels/tags/buttons: Alata
+   ===================================================================== */
+:root {
+  --peach-deep: #B5735A;
+  --font-head: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --font-ui: "Alata", "Inter", -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+h1, .sheet-head h2, .gate-card h2 {
+  font-family: var(--font-head); font-weight: 600; text-transform: none; letter-spacing: 0; line-height: 1.05;
+}
+h1 { font-size: 30px; }
+.sheet-head h2 { font-size: 28px; }
+@media (max-width: 520px) { h1 { font-size: 25px; } }
+
+.btn, .tab, .filter, .tag, .mini, .chip, .field > span, .col-head, .me, .card h3, .empty, .people-list button, .toast {
+  font-family: var(--font-ui); font-weight: 400;
+}
+.card h3 { font-size: 16px; letter-spacing: .01em; }
+.col-head { letter-spacing: .1em; }
+
+/* header trim: white line then a peach line */
+.top { border-bottom: 3px solid var(--white); box-shadow: 0 3px 0 var(--peach); margin-bottom: 3px; }
+
+/* buttons */
+.btn-primary { background: var(--peach); color: var(--ink); }
+.filter.on { background: var(--green); border-color: var(--green); color: var(--white); }
+
+/* stage colours */
+[data-s="todo"],     [data-stage="todo"]     { --hb: #EBD3C7; --ht: var(--ink);   --card: #F8ECE4; --edge: #C4917A; }
+[data-s="assigned"], [data-stage="assigned"] { --hb: #C4917A; --ht: var(--ink);   --card: #F2DBCE; --edge: #C4917A; }
+[data-s="started"],  [data-stage="started"]  { --hb: var(--peach-deep); --ht: var(--white); --card: #EBC8B5; --edge: var(--peach-deep); }
+[data-s="part"],     [data-stage="part"]     { --hb: #A9AD98; --ht: var(--ink);   --card: #E3E6D8; --edge: #7A7F69; }
+[data-s="done"],     [data-stage="done"]     { --hb: var(--green); --ht: var(--white); --card: #D4D8C8; --edge: #7A7F69; }
+
+.tab { background: var(--white); }
+.tab.on { background: var(--hb); color: var(--ht); border-color: var(--hb); }
+.tab.on b { background: var(--white); color: var(--ink); }
+
+.card { background: var(--card); border: 1px solid rgba(255,255,255,.85); border-left: 5px solid var(--edge); box-shadow: 0 1px 2px rgba(47,49,43,.08); }
+.card:active { background: var(--card); filter: brightness(.97); }
+.card p { color: #5A5C52; }
+.tag { background: #6E7360; }
+.tag.due { background: var(--white); color: #8A5744; }
+.tag.late { background: #A8523F; color: var(--white); }
+.tag.meta { background: rgba(255,255,255,.65); color: var(--ink-soft); }
+.mini { background: var(--white); }
+.mini.solid { background: #6E7360; border-color: #6E7360; }
+.mini.peach { border-color: var(--peach-deep); color: #8A5744; }
+
+@media (min-width: 900px) {
+  .col, .col.on { background: var(--main-soft); }
+  .col-head { background: var(--hb); color: var(--ht); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+  .col-head b { background: var(--white); color: var(--ink); }
+}
+
+.stage-pick .chip.on { background: var(--peach); color: var(--ink); border-color: var(--peach); }
+.stage-pick .chip { border-color: var(--peach-deep); }
+
+/* ---------- Passcode gate ---------- */
+body.locked > header, body.locked > nav, body.locked > main { display: none; }
+.gate { position: fixed; inset: 0; z-index: 200; background: var(--main); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.gate[hidden] { display: none; }
+.gate-card { width: 100%; max-width: 360px; text-align: center; background: var(--white); border-radius: 16px; padding: 26px 22px 24px; box-shadow: 0 0 0 5px var(--peach-soft); }
+.gate-logo { width: 150px; height: auto; margin: 0 auto 6px; display: block; }
+.gate-card h2 { margin: 0 0 18px; font-size: 32px; }
+.gate-card h2 span { color: var(--green); }
+.gate-card form { display: grid; gap: 10px; }
+.gate-card label { font-family: var(--font-ui); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.gate-card input {
+  text-align: center; font-size: 28px; letter-spacing: .5em; padding: 12px 8px 12px 20px;
+  border: 2px solid var(--main-deep); border-radius: 10px; width: 100%; background: var(--main-soft);
+}
+.gate-card input:focus { outline: 2px solid var(--peach); border-color: var(--peach); }
+.gate-msg { min-height: 1.4em; margin: 12px 0 0; font-size: 14px; color: var(--danger); }
+.gate-card .btn { width: 100%; margin-top: 4px; }
