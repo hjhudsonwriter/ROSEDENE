@@ -343,3 +343,14 @@ body.view-cal .tabs, body.view-cal .board { display: none; }
 .cal-day-head h3 { flex: 1 1 100%; margin: 0; font-family: var(--font-head); font-weight: 600; font-size: 24px; }
 .cal-note { font-size: 13px; color: var(--ink-soft); }
 @media (min-width: 700px) { .cal-day-head h3 { flex: 0 1 auto; margin-right: 8px; } .cal-day .card { max-width: 560px; } }
+
+/* ---------- Priority ---------- */
+.tag.prio { color: var(--white); letter-spacing: .04em; }
+.tag.prio.P1 { background: #A8523F; }
+.tag.prio.P2 { background: var(--peach-deep); }
+.tag.prio.P3 { background: #6E7360; }
+.chip.prio { border-color: var(--ink-soft); color: var(--ink); min-width: 56px; }
+.chip.prio.on { color: var(--white); border-color: transparent; background: var(--ink-soft); }
+.chip.prio.P1.on { background: #A8523F; }
+.chip.prio.P2.on { background: var(--peach-deep); }
+.chip.prio.P3.on { background: #6E7360; }

@@ -14,6 +14,10 @@ import { firebaseConfig } from './firebase-config.js';
   const DEFAULT_PEOPLE = ['Steve', 'Harry', 'Em', 'Gail', 'Tradesperson'];
   const DEFAULT_ROOMS = ['Kitchen', 'Lounge', 'Dining Room', 'Hall & Stairs', 'Bathroom', 'Bedroom 1', 'Bedroom 2', 'Bedroom 3', 'Garden', 'Garage'];
   const NO_ROOM = '__none';
+  const PRIORITIES = ['P1', 'P2', 'P3'];
+  const prioRank = (t) => { const i = PRIORITIES.indexOf(t.priority); return i < 0 ? 9 : i; };   // no priority sorts last
+  // Highest priority first, then soonest due date, then oldest
+  const byPriority = (a, b) => prioRank(a) - prioRank(b) || (a.due || '9999').localeCompare(b.due || '9999') || a.created - b.created;
   const KEY = 'rosedene.v1';
   const ME_KEY = 'rosedene.me';
 
@@ -204,8 +208,7 @@ import { firebaseConfig } from './firebase-config.js';
     const inRoom = (t) => roomFilter === 'All' || (roomFilter === NO_ROOM ? !roomsOf(t).length : roomsOf(t).includes(roomFilter));
     const visible = state.tasks.filter((t) => (filter === 'All' || t.assignees.includes(filter)) && inRoom(t));
     visibleTasks = visible;
-    const byStage = (id) => visible.filter((t) => t.status === id)
-      .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.created - b.created);
+    const byStage = (id) => visible.filter((t) => t.status === id).sort(byPriority);
 
     $('tabs').innerHTML = STAGES.map((s) =>
       `<button type="button" role="tab" class="tab ${s.id === activeStage ? 'on' : ''}" data-s="${s.id}">${s.label}<b>${byStage(s.id).length}</b></button>`).join('');
@@ -247,7 +250,7 @@ import { firebaseConfig } from './firebase-config.js';
 
     const prefix = `${y}-${String(m + 1).padStart(2, '0')}`;
     const list = (calDay ? visibleTasks.filter((t) => t.due === calDay) : visibleTasks.filter((t) => (t.due || '').startsWith(prefix)))
-      .sort((a, b) => (a.due || '').localeCompare(b.due || '') || a.created - b.created);
+      .sort((a, b) => (a.due || '').localeCompare(b.due || '') || byPriority(a, b));
     const heading = calDay ? fmtDate(calDay) : `Due in ${calMonth.toLocaleDateString('en-GB', { month: 'long' })}`;
     $('calDay').innerHTML = `<div class="cal-day-head"><h3>${heading}</h3>
       ${calDay ? `<button type="button" class="mini solid" data-addday="${calDay}">+ Task on this day</button><button type="button" class="mini" data-clearday>Show whole month</button>` : ''}</div>
@@ -258,6 +261,7 @@ import { firebaseConfig } from './firebase-config.js';
   const roomsOf = (t) => t.rooms || [];
 
   function card(t) {
+    const prio = PRIORITIES.includes(t.priority) ? `<span class="tag prio ${t.priority}">${t.priority}</span>` : '';
     const rooms = roomsOf(t).map((r) => `<span class="tag room">${esc(r)}</span>`).join('');
     const assigned = t.assignees.map((a) => `<span class="tag">${esc(a)}</span>`).join('');
     const due = t.due ? `<span class="tag ${isLate(t) ? 'late' : 'due'}">${isLate(t) ? 'Overdue · ' : 'Due '}${fmtDate(t.due)}</span>` : '';
@@ -273,7 +277,7 @@ import { firebaseConfig } from './firebase-config.js';
     return `<article class="card" draggable="true" data-id="${t.id}">
       <h3>${esc(t.title)}</h3>
       ${t.details ? `<p>${esc(t.details)}</p>` : ''}
-      <div class="tags">${rooms}${assigned}${due}${meta}</div>
+      <div class="tags">${prio}${rooms}${assigned}${due}${meta}</div>
       ${actions.length ? `<div class="card-actions">${actions.join('')}</div>` : ''}
     </article>`;
   }
@@ -353,7 +357,7 @@ import { firebaseConfig } from './firebase-config.js';
     isNew = !task;
     draft = task
       ? { rooms: [], ...JSON.parse(JSON.stringify(task)) }
-      : { id: uid(), title: '', details: '', due: '', assignees: [], rooms: [], status: 'todo', photos: [], links: [], created: Date.now(), updated: Date.now() };
+      : { id: uid(), title: '', details: '', due: '', assignees: [], rooms: [], priority: '', status: 'todo', photos: [], links: [], created: Date.now(), updated: Date.now() };
     if (!task) draft.due = dueDate;
     $('sheetTitle').textContent = isNew ? 'New task' : 'Edit task';
     $('fTitle').value = draft.title;
@@ -371,6 +375,8 @@ import { firebaseConfig } from './firebase-config.js';
   function renderSheet() {
     $('fPeople').innerHTML = state.people.map((p) =>
       `<button type="button" class="chip ${draft.assignees.includes(p) ? 'on' : ''}" data-p="${esc(p)}">${esc(p)}</button>`).join('');
+    $('fPriority').innerHTML = ['', ...PRIORITIES].map((p) =>
+      `<button type="button" class="chip prio ${p} ${(draft.priority || '') === p ? 'on' : ''}" data-pr="${p}">${p || 'None'}</button>`).join('');
     $('fRooms').innerHTML = state.rooms.map((r) =>
       `<button type="button" class="chip room ${draft.rooms.includes(r) ? 'on' : ''}" data-r="${esc(r)}">${esc(r)}</button>`).join('');
     $('fStage').innerHTML = STAGES.map((s) =>
@@ -386,6 +392,10 @@ import { firebaseConfig } from './firebase-config.js';
     const p = b.dataset.p, a = draft.assignees;
     a.includes(p) ? a.splice(a.indexOf(p), 1) : a.push(p);
     normalise(draft); renderSheet();
+  });
+  $('fPriority').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pr]'); if (!b) return;
+    draft.priority = b.dataset.pr; renderSheet();
   });
   $('fRooms').addEventListener('click', (e) => {
     const b = e.target.closest('[data-r]'); if (!b) return;
