@@ -2,6 +2,8 @@
 
 A phone-friendly kanban board for our house projects. Static files only — host it anywhere (GitHub Pages is easiest).
 
+Want a copy for another house? See [`CLONING.md`](CLONING.md). House-specific settings are in `site-config.js`, colours in `theme.css`, and icons in `icons/`.
+
 ## Shared database setup (free, no card needed)
 
 The app syncs through Google Firebase **Firestore** on the free *Spark* plan (no billing details required).

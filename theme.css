@@ -1,0 +1,79 @@
+/* =====================================================================
+   THEME — every colour, font and logo treatment lives here.
+   styles.css contains no colour values of its own, so a different house
+   only needs this file (plus site-config.js, the icons and the manifest).
+   See CLONING.md.
+
+   How the palette is used
+   ----------------------------------------------------------------
+   --main*        page + header + sheet background, columns, calendar days
+   --accent*      primary accent (buttons, "started" stage, today marker)
+   --accent2*     secondary accent (tags, chips, "completed" stage)
+   --text*        text that sits ON --main / --main-soft  (light if --main is dark)
+   --ink*         text that sits on LIGHT surfaces (cards, inputs, white buttons)
+   --surface      light surfaces (inputs, ghost buttons, tabs, calendar days with tasks)
+   --trim         the thin lines that finish edges (white in the original)
+   Text on dark fills (tags, "started"/"completed" headers) is always --white,
+   so keep --accent-deep, --accent2, --accent2-deep and --danger dark enough for white text.
+   ===================================================================== */
+:root {
+  /* ---- Page ---- */
+  --main: #D6D0C6;          /* Cancún */
+  --main-soft: #E6E2DA;
+  --main-deep: #C5BEB2;
+  --surface: #FFFFFF;
+  --surface-alt: #E6E2DA;   /* passcode box */
+  --trim: #FFFFFF;
+  --white: #FFFFFF;
+
+  /* ---- Text ---- */
+  --text: #2F312B;
+  --text-soft: #6B6D63;
+  --ink: #2F312B;
+  --ink-soft: #6B6D63;
+  --card-text-soft: #5A5C52;
+
+  /* ---- Accent 1 (peach) ---- */
+  --accent: #C4917A;
+  --accent-soft: #EBD3C7;
+  --accent-deep: #B5735A;
+  --accent-ink: #8A5744;    /* accent-coloured text on light surfaces */
+  --on-accent: #2F312B;     /* text on a solid --accent fill */
+
+  /* ---- Accent 2 (olive) ---- */
+  --accent2: #7A7F69;
+  --accent2-deep: #6E7360;
+  --accent2-mid: #A9AD98;
+  --accent2-on-main: #7A7F69;   /* accent-2 coloured text sitting on --main */
+
+  /* ---- Alerts ---- */
+  --danger: #A8523F;            /* overdue, P1, delete (on light surfaces) */
+  --danger-on-main: #A8523F;    /* delete button on --main */
+
+  /* ---- Stage colours: header/tab, header text, card tint, card edge ---- */
+  --stage-todo-head: #EBD3C7;      --stage-todo-head-text: #2F312B;      --stage-todo-card: #F8ECE4;      --stage-todo-edge: #C4917A;
+  --stage-assigned-head: #C4917A;  --stage-assigned-head-text: #2F312B;  --stage-assigned-card: #F2DBCE;  --stage-assigned-edge: #C4917A;
+  --stage-started-head: #B5735A;   --stage-started-head-text: #FFFFFF;   --stage-started-card: #EBC8B5;   --stage-started-edge: #B5735A;
+  --stage-part-head: #A9AD98;      --stage-part-head-text: #2F312B;      --stage-part-card: #E3E6D8;      --stage-part-edge: #7A7F69;
+  --stage-done-head: #7A7F69;      --stage-done-head-text: #FFFFFF;      --stage-done-card: #D4D8C8;      --stage-done-edge: #7A7F69;
+
+  /* ---- Misc ---- */
+  --card-rim: rgba(255,255,255,.85);
+  --tag-meta-bg: rgba(255,255,255,.65);
+  --scrim: rgba(47,49,43,.5);
+  --scrim-btn: rgba(47,49,43,.75);
+  --toast-bg: #2F312B;
+  --toast-text: #FFFFFF;
+
+  /* ---- Logo treatment (header). Light pages: let the logo's white melt away.
+          Dark pages: show it on a white tile (blend normal, bg #fff, radius 10px). ---- */
+  --logo-blend: multiply;
+  --logo-bg: transparent;
+  --logo-radius: 0;
+
+  /* ---- Shape + type ---- */
+  --radius: 10px;
+  --font-head: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --font-ui: "Alata", "Inter", -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-body: "Inter", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}

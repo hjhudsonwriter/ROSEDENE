@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Per-house values in this <head> (see CLONING.md): theme-color, apple-mobile-web-app-title, <title> -->
 <meta name="theme-color" content="#D6D0C6">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/favicon.png">
@@ -14,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Alata&family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body class="locked">
@@ -21,8 +23,8 @@
 <!-- Passcode gate (only used once the shared database is configured) -->
 <div class="gate" id="gate">
   <div class="gate-card">
-    <img class="gate-logo" src="icons/logo.jpg" alt="Rosedene house" width="480" height="440">
-    <h2>Rosedene <span>Task Tracker</span></h2>
+    <img class="gate-logo" data-site-logo src="icons/logo.jpg" alt="" width="480" height="440">
+    <h2 data-site-title></h2>
     <form id="gateForm" autocomplete="off">
       <label for="gateCode">Enter passcode</label>
       <input id="gateCode" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="••••••" autocomplete="off" required>
@@ -36,8 +38,8 @@
 <header class="top">
   <div class="top-row">
     <div class="brand">
-      <img class="logo" src="icons/logo.jpg" alt="Rosedene house" width="480" height="440">
-      <h1>Rosedene <span>Task Tracker</span></h1>
+      <img class="logo" data-site-logo src="icons/logo.jpg" alt="" width="480" height="440">
+      <h1 data-site-title></h1>
     </div>
     <button class="btn btn-primary" id="addBtn" type="button">+ New task</button>
   </div>

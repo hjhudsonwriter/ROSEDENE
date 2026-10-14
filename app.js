@@ -1,36 +1,42 @@
 import { firebaseConfig } from './firebase-config.js';
+import { siteConfig } from './site-config.js';
 
 (async () => {
   'use strict';
 
   const STAGES = [
-    { id: 'todo',     label: 'To Do',          color: '#C5BEB2' },
-    { id: 'assigned', label: 'Assigned',       color: '#7A7F69' },
-    { id: 'started',  label: 'Started',        color: '#C4917A' },
-    { id: 'part',     label: 'Part Completed', color: '#A9A58B' },
-    { id: 'done',     label: 'Completed',      color: '#2F312B' },
+    { id: 'todo',     label: 'To Do' },
+    { id: 'assigned', label: 'Assigned' },
+    { id: 'started',  label: 'Started' },
+    { id: 'part',     label: 'Part Completed' },
+    { id: 'done',     label: 'Completed' },
   ];
   const NEXT = { assigned: ['started', 'Start'], started: ['done', 'Complete'], part: ['done', 'Complete'] };
-  const DEFAULT_PEOPLE = ['Steve', 'Harry', 'Em', 'Gail', 'Tradesperson'];
-  const DEFAULT_ROOMS = ['Kitchen', 'Lounge', 'Dining Room', 'Hall & Stairs', 'Bathroom', 'Bedroom 1', 'Bedroom 2', 'Bedroom 3', 'Garden', 'Garage'];
+  const DEFAULT_PEOPLE = siteConfig.people;
+  const DEFAULT_ROOMS = siteConfig.rooms;
+  const PREFIX = siteConfig.storagePrefix;
   const NO_ROOM = '__none';
   const PRIORITIES = ['P1', 'P2', 'P3'];
   const prioRank = (t) => { const i = PRIORITIES.indexOf(t.priority); return i < 0 ? 9 : i; };   // no priority sorts last
   // Highest priority first, then soonest due date, then oldest
   const byPriority = (a, b) => prioRank(a) - prioRank(b) || (a.due || '9999').localeCompare(b.due || '9999') || a.created - b.created;
-  const KEY = 'rosedene.v1';
-  const ME_KEY = 'rosedene.me';
+  const KEY = `${PREFIX}.v1`;
+  const ME_KEY = `${PREFIX}.me`;
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  // ---------- House name (from site-config.js) ----------
+  document.querySelectorAll('[data-site-title]').forEach((el) => { el.innerHTML = `${esc(siteConfig.name)} <span>${esc(siteConfig.title)}</span>`; });
+  document.querySelectorAll('[data-site-logo]').forEach((img) => { img.alt = siteConfig.name; });
 
   // ---------- State ----------
   let state = load();
   let me = safeGet(ME_KEY) || '';
   let filter = 'All';
   let roomFilter = 'All';
-  let view = safeGet('rosedene.view') === 'cal' ? 'cal' : 'board';
+  let view = safeGet(`${PREFIX}.view`) === 'cal' ? 'cal' : 'board';
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   let calMonth = new Date(); calMonth.setDate(1);
   let calDay = null;      // selected day (yyyy-mm-dd) or null for "whole month"
@@ -53,7 +59,7 @@ import { firebaseConfig } from './firebase-config.js';
   // The 6-digit passcode is the name of the board in the database (houses/<passcode>/...). The Firestore rules
   // don't allow listing boards, so you can only reach data if you already know the passcode.
   const FB = 'https://www.gstatic.com/firebasejs/10.12.2/';
-  const CODE_KEY = 'rosedene.code';
+  const CODE_KEY = `${PREFIX}.code`;
   const USE_CLOUD = !!firebaseConfig.apiKey;
   let fbLib = null;     // { db, fs } once Firebase is loaded
   let cloud = null;     // { db, fs, code } while a board is open
@@ -215,7 +221,7 @@ import { firebaseConfig } from './firebase-config.js';
 
     $('board').innerHTML = STAGES.map((s) => {
       const list = byStage(s.id);
-      return `<section class="col ${s.id === activeStage ? 'on' : ''}" data-stage="${s.id}" style="--stage:${s.color}">
+      return `<section class="col ${s.id === activeStage ? 'on' : ''}" data-stage="${s.id}">
         <div class="col-head"><span>${s.label}</span><b>${list.length}</b></div>
         ${list.length ? list.map(card).join('') : '<div class="empty">Nothing here yet</div>'}
       </section>`;
@@ -271,8 +277,8 @@ import { firebaseConfig } from './firebase-config.js';
     const actions = [];
     if (me && !t.assignees.includes(me) && t.status !== 'done') actions.push(`<button type="button" class="mini solid" data-act="assign">Assign me</button>`);
     if (NEXT[t.status]) actions.push(`<button type="button" class="mini" data-act="next">${NEXT[t.status][1]} →</button>`);
-    if (t.status === 'started') actions.push(`<button type="button" class="mini peach" data-act="part">Part complete</button>`);
-    if (t.status === 'done') actions.push(`<button type="button" class="mini peach" data-act="reopen">Reopen</button>`);
+    if (t.status === 'started') actions.push(`<button type="button" class="mini accent" data-act="part">Part complete</button>`);
+    if (t.status === 'done') actions.push(`<button type="button" class="mini accent" data-act="reopen">Reopen</button>`);
 
     return `<article class="card" draggable="true" data-id="${t.id}">
       <h3>${esc(t.title)}</h3>
@@ -316,7 +322,7 @@ import { firebaseConfig } from './firebase-config.js';
   // Calendar navigation
   document.querySelector('.viewbar').addEventListener('click', (e) => {
     const b = e.target.closest('[data-view]'); if (!b) return;
-    view = b.dataset.view; safeSet('rosedene.view', view); render();
+    view = b.dataset.view; safeSet(`${PREFIX}.view`, view); render();
   });
   $('calPrev').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() - 1); calDay = null; render(); });
   $('calNext').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() + 1); calDay = null; render(); });
@@ -527,7 +533,7 @@ import { firebaseConfig } from './firebase-config.js';
   $('exportBtn').addEventListener('click', () => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(state)], { type: 'application/json' }));
-    a.download = `rosedene-backup-${new Date().toLocaleDateString('en-CA')}.json`;
+    a.download = `${PREFIX}-backup-${new Date().toLocaleDateString('en-CA')}.json`;
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
   $('importInput').addEventListener('change', async (e) => {
