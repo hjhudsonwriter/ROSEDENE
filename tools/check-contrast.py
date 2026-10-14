@@ -4,13 +4,16 @@
     python3 tools/check-contrast.py theme.css
 
 Prints the contrast ratio for every pairing the app uses and flags any below 4.5:1
-(3:1 for the accent-coloured text sitting on cards). The original Rosedene palette is a
+(3:1 for the accent-coloured text sitting on cards). The original (Cancún) palette is a
 soft, low-contrast one, so it flags several; a new theme should aim for none.
 """
 import re, sys
 def tokens(path):
     t = {}
-    for m in re.finditer(r'--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})', open(path).read()): t[m.group(1)] = m.group(2)
+    text = open(path).read()
+    for m in re.finditer(r'--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})\s*;', text): t[m.group(1)] = m.group(2)
+    for m in re.finditer(r'--([a-z0-9-]+):\s*var\(--([a-z0-9-]+)\)\s*;', text):   # aliases, e.g. --sel-ring: var(--accent2)
+        if m.group(2) in t: t[m.group(1)] = t[m.group(2)]
     return t
 def lum(h):
     h=h.lstrip('#'); r,g,b=[int(h[i:i+2],16)/255 for i in (0,2,4)]
@@ -31,6 +34,8 @@ def run(path):
      ('accent-ink on surface (chips/mini)','accent-ink','surface',4.5),('accent2 on surface (mini, chip text)','accent2','surface',4.5),
      ('danger on surface (gate msg, remove)','danger','surface',4.5),
      ('toast','toast-text','toast-bg',4.5),
+     ('selected-day ring on main-soft','sel-ring','main-soft',3.0),('selected-day ring on surface','sel-ring','surface',3.0),
+     ('sync dot live on main','accent2-on-main','main',3.0),('sync dot error on main','danger-on-main','main',3.0),
     ]
     for s in ('todo','assigned','started','part','done'):
         pairs += [(f'stage {s}: head text on head','stage-%s-head-text'%s,'stage-%s-head'%s,4.5),

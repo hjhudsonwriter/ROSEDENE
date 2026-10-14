@@ -4,6 +4,13 @@ import { siteConfig } from './site-config.js';
 (async () => {
   'use strict';
 
+  // Fail loudly (rather than silently re-keying saved data) if site-config.js is incomplete.
+  if (!siteConfig || typeof siteConfig.name !== 'string' || !/^[a-z0-9-]+$/i.test(siteConfig.storagePrefix || '')
+      || !Array.isArray(siteConfig.people) || !Array.isArray(siteConfig.rooms)) {
+    throw new Error('site-config.js is incomplete: needs name, storagePrefix (letters/numbers/dashes), people[] and rooms[]');
+  }
+  document.body.dataset.ready = '1';       // tells the page's load-failure notice that the app started
+
   const STAGES = [
     { id: 'todo',     label: 'To Do' },
     { id: 'assigned', label: 'Assigned' },
@@ -29,7 +36,7 @@ import { siteConfig } from './site-config.js';
 
   // ---------- House name (from site-config.js) ----------
   document.querySelectorAll('[data-site-title]').forEach((el) => { el.innerHTML = `${esc(siteConfig.name)} <span>${esc(siteConfig.title)}</span>`; });
-  document.querySelectorAll('[data-site-logo]').forEach((img) => { img.alt = siteConfig.name; });
+  document.querySelectorAll('[data-site-logo]').forEach((img) => { img.alt = `${siteConfig.name} house`; });
 
   // ---------- State ----------
   let state = load();

@@ -1,10 +1,26 @@
 /* =====================================================================
    PRESET: dark navy (main) + slate grey (accent 2) + terracotta (accent 1)
-   A dark theme. To use it, copy this file over theme.css:   cp presets/navy-slate-terracotta.css theme.css
-   Then also update <meta name="theme-color"> in index.html and the colours in
-   manifest.webmanifest to --main (#1B2A45). See CLONING.md.
+   A dark theme. To use it:  cp presets/navy-slate-terracotta.css theme.css
+   Then set <meta name="theme-color"> in index.html and background_color / theme_color
+   in manifest.webmanifest to --main (#1B2A45). See CLONING.md.
+
+   How the palette is used
+   ----------------------------------------------------------------
+   --main*        page + header + sheet background, columns, calendar days
+   --accent*      primary accent (buttons, "started" stage, today marker)
+   --accent2*     secondary accent (tags, chips, "completed" stage)
+   --text*        text that sits ON --main / --main-soft  (light here, because --main is dark)
+   --ink*         text that sits on LIGHT surfaces (cards, inputs, white buttons)
+   --surface      light surfaces (inputs, ghost buttons, tabs, calendar days with tasks)
+   --trim         the thin lines that finish edges (white)
+   Text on dark fills (tags, "started"/"completed" headers) is always --white, so keep
+   --accent-deep, --accent2, --accent2-deep and --danger dark enough for white text.
+   Check readability with:  python3 tools/check-contrast.py theme.css
+   styles.css contains no colour values of its own: everything comes from this file.
    ===================================================================== */
 :root {
+  color-scheme: dark;       /* form controls are kept light separately in styles.css */
+
   /* ---- Page ---- */
   --main: #1B2A45;          /* dark navy */
   --main-soft: #243558;
@@ -52,6 +68,10 @@
   --scrim-btn: rgba(27,42,69,.8);
   --toast-bg: #F4F0E8;
   --toast-text: #1B2A45;
+  --toast-shadow: 0 6px 18px rgba(0,0,0,.45);   /* the cream toast needs an edge over white surfaces */
+  --card-shadow: 0 1px 2px rgba(0,0,0,.18);
+  --viewer-scrim: rgba(8,14,28,.92);
+  --sel-ring: #CF7553;               /* selected day: 3:1+ on both the navy day cell and the white one */
 
   /* ---- Logo on a dark page: show it on a white tile ---- */
   --logo-blend: normal;
